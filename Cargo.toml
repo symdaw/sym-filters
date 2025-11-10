@@ -1,0 +1,10 @@
+[package]
+name = "sym-filters"
+version = "0.1.0"
+edition = "2024"
+
+[env]
+RUSTC_BOOTSTRAP="1" # Cry about it
+
+[dependencies]
+num-complex = "0.4"
