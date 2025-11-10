@@ -1,5 +1,5 @@
 # sym-filters
-Audio filters for rust.
+Audio filters for Rust.
 
 This crate requires either nightly, `RUSTC_BOOTSTRAP=1` or `RUSTC_BOOTSTRAP=sym_filters` for fast math. If you wish to use this set these environment variables before compiling.
 
