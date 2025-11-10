@@ -1,6 +1,8 @@
 # sym-filters
 Audio filters for rust.
 
+This crate requires `RUSTC_BOOTSTRAP=1` or `RUSTC_BOOTSTRAP=sym_filters` for fast math. If you wish to use this set these environment variables before compiling.
+
 ## Examples
 ### Low-pass filter
 ```rs
