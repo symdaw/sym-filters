@@ -1,4 +1,4 @@
-#![feature(core_intrinsics)]
+// #![feature(core_intrinsics)]
 #![allow(nonstandard_style)]
 #![allow(internal_features)]
 
@@ -11,9 +11,11 @@ pub trait Filter {
     fn bandwidth(&self, sample_rate: f32) -> f32;
 
     fn amplitude_response(&self, f: f32, sample_rate: f32) -> f32 {
+        //    G(ω) = |H(e^jωT)|
         self.transfer_function(f, sample_rate).norm() as f32
     }
     fn phase_response(&self, f: f32, sample_rate: f32) -> f32 {
+        //    ϕ(ω) = ∠ H(e^jωT)
         self.transfer_function(f, sample_rate).arg() as f32
     }
 }

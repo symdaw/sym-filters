@@ -1,6 +1,6 @@
 use std::{
     f32,
-    intrinsics::{fadd_fast, fmul_fast, fsub_fast},
+    // intrinsics::{fadd_fast, fmul_fast, fsub_fast},
 };
 
 use num_complex::Complex64;
@@ -38,19 +38,19 @@ impl Filter for Biquad {
                 let x = *frame as f64;
 
                 // Lame version:
-                // let y = b0 * x + b1 * x_memory[0] + b2 * x_memory[1]
-                //     - a1 * y_memory[0]
-                //     - a2 * y_memory[1];
+                let y = b0 * x + b1 * x_memory[0] + b2 * x_memory[1]
+                    - a1 * y_memory[0]
+                    - a2 * y_memory[1];
 
-                let y = unsafe {
-                    let preset = fmul_fast(b0, x);
-                    let feedforward =
-                        fadd_fast(fmul_fast(b1, x_memory[0]), fmul_fast(b2, x_memory[1]));
-                    let feedback =
-                        fadd_fast(fmul_fast(a1, y_memory[0]), fmul_fast(a2, y_memory[1]));
-
-                    fsub_fast(fadd_fast(preset, feedforward), feedback)
-                };
+                // let y = unsafe {
+                //     let preset = fmul_fast(b0, x);
+                //     let feedforward =
+                //         fadd_fast(fmul_fast(b1, x_memory[0]), fmul_fast(b2, x_memory[1]));
+                //     let feedback =
+                //         fadd_fast(fmul_fast(a1, y_memory[0]), fmul_fast(a2, y_memory[1]));
+                //
+                //     fsub_fast(fadd_fast(preset, feedforward), feedback)
+                // };
 
                 y_memory[1] = y_memory[0];
                 x_memory[1] = x_memory[0];
@@ -80,11 +80,18 @@ impl Filter for Biquad {
         //    H(z) = (b0 + b1 z^-1 + b2 z^-2) / (a0 + a1 z^-1 + a2 z^-2)
         //    let z = e^jωT
         //    H(e^jωT) = (b0 + b1 e^-jωT + b2 e^-2jωT) / (a0 + a1 e^-jωT + a2 e^-2jωT)
-        //    G(ω) = |H(e^jωT)|
 
-        let omega = (2. * std::f32::consts::PI * f / sample_rate) as f64;
-        let z1 = (-Complex64::i() * omega).exp();
-        let z2 = (-2. * Complex64::i() * omega).exp();
+        //
+
+        // let omega = (2. * std::f32::consts::PI * f / sample_rate) as f64;
+
+        //    ω_d = 2/T arctan(ω_a T/2)
+
+        let T = 1. / sample_rate as f64;
+        let omega = (2. / T) * (f as f64 * T / 2.).tan();
+
+        let z1 = (-Complex64::i() * omega * T).exp();
+        let z2 = (-2. * Complex64::i() * omega * T).exp();
         let num = self.b0 + self.b1 * z1 + self.b2 * z2;
         let denom = self.a0 + self.a1 * z1 + self.a2 * z2;
         num / denom
@@ -101,7 +108,7 @@ impl Biquad {
     }
 
     // All of these are from the EQ cookbook (https://webaudio.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html)
-    // They are on biliear transformations of prototype analog filters.
+    // They are biliear transformations of prototype analog filters.
 
     pub fn lpf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
@@ -115,6 +122,10 @@ impl Biquad {
     }
 
     pub fn hpf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
+        if cutoff >= sample_rate / 2. {
+            return;
+        }
+
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
         self.b0 = (1. + omega_0.cos()) / 2.;
@@ -126,6 +137,10 @@ impl Biquad {
     }
 
     pub fn bpf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
+        if cutoff >= sample_rate / 2. {
+            return;
+        }
+
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
         self.b0 = q as f64 * alpha;
@@ -137,6 +152,10 @@ impl Biquad {
     }
 
     pub fn notch(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
+        if cutoff >= sample_rate / 2. {
+            return;
+        }
+
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
         self.b0 = 1.;
@@ -148,6 +167,10 @@ impl Biquad {
     }
 
     pub fn apf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
+        if cutoff >= sample_rate / 2. {
+            return;
+        }
+
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
         self.b0 = 1. - alpha;
@@ -159,6 +182,10 @@ impl Biquad {
     }
 
     pub fn bell(&mut self, cutoff: f32, q: f32, gain: f32, sample_rate: f32) {
+        if cutoff >= sample_rate / 2. {
+            return;
+        }
+
         let A = 10f32.powf(gain / 40.) as f64;
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
@@ -172,6 +199,10 @@ impl Biquad {
     }
 
     pub fn low_shelf(&mut self, cutoff: f32, q: f32, gain: f32, sample_rate: f32) {
+        if cutoff >= sample_rate / 2. {
+            return;
+        }
+        
         let A = 10f32.powf(gain / 40.) as f64;
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
@@ -186,6 +217,10 @@ impl Biquad {
     }
 
     pub fn high_shelf(&mut self, cutoff: f32, q: f32, gain: f32, sample_rate: f32) {
+        if cutoff >= sample_rate / 2. {
+            return;
+        }
+
         let A = 10f32.powf(gain / 40.) as f64;
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
