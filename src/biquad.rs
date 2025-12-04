@@ -211,9 +211,9 @@ impl Biquad {
         self.b1 = 2. * A * ((A - 1.) - (A + 1.) * omega_0.cos());
         self.b2 = A * ((A + 1.) - (A - 1.) * omega_0.cos() - 2. * A.sqrt() * alpha);
 
-        self.a0 = (A + 1.) - (A - 1.) * omega_0.cos() + 2. * A.sqrt() * alpha;
-        self.a1 = -2. * ((A - 1.) - (A + 1.) * omega_0.cos());
-        self.a2 = (A + 1.) - (A - 1.) * omega_0.cos() - 2. * A.sqrt() * alpha;
+        self.a0 = (A + 1.) + (A - 1.) * omega_0.cos() + 2. * A.sqrt() * alpha;
+        self.a1 = -2. * ((A - 1.) + (A + 1.) * omega_0.cos());
+        self.a2 = (A + 1.) + (A - 1.) * omega_0.cos() - 2. * A.sqrt() * alpha;
     }
 
     pub fn high_shelf(&mut self, cutoff: f32, q: f32, gain: f32, sample_rate: f32) {
@@ -226,11 +226,11 @@ impl Biquad {
         let alpha = omega_0.sin() / (2. * q as f64);
 
         self.b0 = A * ((A + 1.) + (A - 1.) * omega_0.cos() + 2. * A.sqrt() * alpha);
-        self.b1 = 2. * A * ((A - 1.) + (A + 1.) * omega_0.cos());
+        self.b1 = -2. * A * ((A - 1.) + (A + 1.) * omega_0.cos());
         self.b2 = A * ((A + 1.) + (A - 1.) * omega_0.cos() - 2. * A.sqrt() * alpha);
 
         self.a0 = (A + 1.) - (A - 1.) * omega_0.cos() + 2. * A.sqrt() * alpha;
-        self.a1 = -2. * ((A - 1.) - (A + 1.) * omega_0.cos());
+        self.a1 = 2. * ((A - 1.) - (A + 1.) * omega_0.cos());
         self.a2 = (A + 1.) - (A - 1.) * omega_0.cos() - 2. * A.sqrt() * alpha;
     }
 }
