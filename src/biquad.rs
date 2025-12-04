@@ -81,14 +81,8 @@ impl Filter for Biquad {
         //    let z = e^jωT
         //    H(e^jωT) = (b0 + b1 e^-jωT + b2 e^-2jωT) / (a0 + a1 e^-jωT + a2 e^-2jωT)
 
-        //
-
-        // let omega = (2. * std::f32::consts::PI * f / sample_rate) as f64;
-
-        //    ω_d = 2/T arctan(ω_a T/2)
-
+        let omega = (2. * std::f32::consts::PI * f) as f64;
         let T = 1. / sample_rate as f64;
-        let omega = (2. / T) * (f as f64 * T / 2.).tan();
 
         let z1 = (-Complex64::i() * omega * T).exp();
         let z2 = (-2. * Complex64::i() * omega * T).exp();
@@ -97,7 +91,7 @@ impl Filter for Biquad {
         num / denom
     }
 
-    fn bandwidth(&self, sample_rate: f32) -> f32 {
+    fn bandwidth(&self, _sample_rate: f32) -> f32 {
         todo!()
     }
 }
@@ -108,7 +102,7 @@ impl Biquad {
     }
 
     // All of these are from the EQ cookbook (https://webaudio.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html)
-    // They are biliear transformations of prototype analog filters.
+    // They are pre-warped biliear transformations of prototype analog filters.
 
     pub fn lpf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
