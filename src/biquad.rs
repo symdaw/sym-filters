@@ -22,56 +22,10 @@ pub struct Biquad {
 impl Filter for Biquad {
     fn process(&mut self, data: &mut [Vec<f32>]) {
         for (channel_i, channel) in data.iter_mut().enumerate() {
-            // Trying to encourage using registers.
-            // Sets back at end of function.
-            // Maybe unnecessary.
-            let mut x_memory = self.x_memory[channel_i];
-            let mut y_memory = self.y_memory[channel_i];
-
-            let b0 = self.b0 / self.a0;
-            let b1 = self.b1 / self.a0;
-            let b2 = self.b2 / self.a0;
-            let a1 = self.a1 / self.a0;
-            let a2 = self.a2 / self.a0;
-
             for frame in channel.iter_mut() {
-                let x = *frame as f64;
-
-                let mut y = unsafe {
-                    let preset = fmul_fast(b0, x);
-                    let feedforward =
-                        fadd_fast(fmul_fast(b1, x_memory[0]), fmul_fast(b2, x_memory[1]));
-                    let feedback =
-                        fadd_fast(fmul_fast(a1, y_memory[0]), fmul_fast(a2, y_memory[1]));
-
-                    fsub_fast(fadd_fast(preset, feedforward), feedback)
-                };
-
-                if !y.is_finite() {
-                    y = 0.;
-                }
-
-                y_memory[1] = y_memory[0];
-                x_memory[1] = x_memory[0];
-                y_memory[0] = y;
-                x_memory[0] = x;
-
-                *frame = y as f32;
+                self.process_sample(frame, channel_i);
             }
-
-            for mem in x_memory.iter_mut() {
-                if !mem.is_finite() || mem.is_subnormal() {
-                    *mem = 0.;
-                }
-            }
-            for mem in y_memory.iter_mut() {
-                if !mem.is_finite() || mem.is_subnormal() {
-                    *mem = 0.;
-                }
-            }
-
-            self.x_memory[channel_i] = x_memory;
-            self.y_memory[channel_i] = y_memory;
+            self.cleanup(channel_i);
         }
     }
 
@@ -100,6 +54,58 @@ impl Biquad {
         Self::default()
     }
 
+    fn normalize(&mut self) {
+        self.b0 /= self.a0;
+        self.b1 /= self.a0;
+        self.b2 /= self.a0;
+        self.a1 /= self.a0;
+        self.a2 /= self.a0;
+        self.a0 = 1.;
+    }
+
+    #[inline(always)]
+    pub(crate) fn process_sample(&mut self, sample: &mut f32, channel_i: usize) {
+        let x = *sample as f64;
+
+        let mut y = unsafe {
+            let present = fmul_fast(self.b0, x);
+            let feedforward = fadd_fast(
+                fmul_fast(self.b1, self.x_memory[channel_i][0]),
+                fmul_fast(self.b2, self.x_memory[channel_i][1]),
+            );
+            let feedback = fadd_fast(
+                fmul_fast(self.a1, self.y_memory[channel_i][0]),
+                fmul_fast(self.a2, self.y_memory[channel_i][1]),
+            );
+
+            fsub_fast(fadd_fast(present, feedforward), feedback)
+        };
+
+        if !y.is_finite() {
+            y = 0.;
+        }
+
+        self.y_memory[channel_i][1] = self.y_memory[channel_i][0];
+        self.x_memory[channel_i][1] = self.x_memory[channel_i][0];
+        self.y_memory[channel_i][0] = y;
+        self.x_memory[channel_i][0] = x;
+
+        *sample = y as f32;
+    }
+
+    fn cleanup(&mut self, channel_i: usize) {
+        for mem in self.x_memory[channel_i].iter_mut() {
+            if !mem.is_finite() || mem.is_subnormal() {
+                *mem = 0.;
+            }
+        }
+        for mem in self.y_memory[channel_i].iter_mut() {
+            if !mem.is_finite() || mem.is_subnormal() {
+                *mem = 0.;
+            }
+        }
+    }
+
     // All of these are from the EQ cookbook (https://webaudio.github.io/Audio-EQ-Cookbook/audio-eq-cookbook.html)
     // They are pre-warped biliear transformations of prototype analog filters.
 
@@ -111,7 +117,8 @@ impl Biquad {
         self.b2 = (1. - omega_0.cos()) / 2.;
         self.a0 = 1. + alpha;
         self.a1 = -2. * omega_0.cos();
-        self.a2 = 1. - alpha;    
+        self.a2 = 1. - alpha;
+        self.normalize();
     }
 
     pub fn hpf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
@@ -127,6 +134,7 @@ impl Biquad {
         self.a0 = 1. + alpha;
         self.a1 = -2. * omega_0.cos();
         self.a2 = 1. - alpha;
+        self.normalize();
     }
 
     pub fn bpf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
@@ -142,6 +150,7 @@ impl Biquad {
         self.a0 = 1. + alpha;
         self.a1 = -2. * omega_0.cos();
         self.a2 = 1. - alpha;
+        self.normalize();
     }
 
     pub fn notch(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
@@ -157,6 +166,7 @@ impl Biquad {
         self.a0 = 1. + alpha;
         self.a1 = -2. * omega_0.cos();
         self.a2 = 1. - alpha;
+        self.normalize();
     }
 
     pub fn apf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
@@ -172,6 +182,7 @@ impl Biquad {
         self.a0 = 1. + alpha;
         self.a1 = -2. * omega_0.cos();
         self.a2 = 1. - alpha;
+        self.normalize();
     }
 
     pub fn bell(&mut self, cutoff: f32, q: f32, gain: f32, sample_rate: f32) {
@@ -189,6 +200,7 @@ impl Biquad {
         self.a0 = 1. + alpha / A;
         self.a1 = -2. * omega_0.cos();
         self.a2 = 1. - alpha / A;
+        self.normalize();
     }
 
     pub fn low_shelf(&mut self, cutoff: f32, q: f32, gain: f32, sample_rate: f32) {
@@ -207,6 +219,7 @@ impl Biquad {
         self.a0 = (A + 1.) + (A - 1.) * omega_0.cos() + 2. * A.sqrt() * alpha;
         self.a1 = -2. * ((A - 1.) + (A + 1.) * omega_0.cos());
         self.a2 = (A + 1.) + (A - 1.) * omega_0.cos() - 2. * A.sqrt() * alpha;
+        self.normalize();
     }
 
     pub fn high_shelf(&mut self, cutoff: f32, q: f32, gain: f32, sample_rate: f32) {
@@ -225,5 +238,6 @@ impl Biquad {
         self.a0 = (A + 1.) - (A - 1.) * omega_0.cos() + 2. * A.sqrt() * alpha;
         self.a1 = 2. * ((A - 1.) - (A + 1.) * omega_0.cos());
         self.a2 = (A + 1.) - (A - 1.) * omega_0.cos() - 2. * A.sqrt() * alpha;
+        self.normalize();
     }
 }

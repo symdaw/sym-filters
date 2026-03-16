@@ -4,9 +4,11 @@
 
 mod biquad;
 mod comb;
+mod scream;
 
 pub use biquad::Biquad;
 pub use comb::Comb;
+pub use scream::Scream;
 
 pub trait Filter {
     fn process(&mut self, data: &mut [Vec<f32>]);
