@@ -18,8 +18,9 @@ impl Filter for Scream {
 
                 let mut feedback_gain = self.feedback_gain;
 
-                if self.input_volume[channel_i] < 0.5 {
-                    feedback_gain *= self.input_volume[channel_i];
+                const THRESHOLD: f32 = 0.05;
+                if self.input_volume[channel_i] < THRESHOLD {
+                    feedback_gain *= self.input_volume[channel_i] / THRESHOLD;
                 }
 
                 // Based on https://github.com/Speechrezz/Scream-Filter
