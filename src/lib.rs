@@ -3,7 +3,10 @@
 #![allow(internal_features)]
 
 mod biquad;
+mod comb;
+
 pub use biquad::Biquad;
+pub use comb::Comb;
 
 pub trait Filter {
     fn process(&mut self, data: &mut [Vec<f32>]);
