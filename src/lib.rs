@@ -1,4 +1,4 @@
-// #![feature(core_intrinsics)]
+#![feature(core_intrinsics)]
 #![allow(nonstandard_style)]
 #![allow(internal_features)]
 

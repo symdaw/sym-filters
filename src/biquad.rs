@@ -1,6 +1,6 @@
 use std::{
     f32,
-    // intrinsics::{fadd_fast, fmul_fast, fsub_fast},
+    intrinsics::{fadd_fast, fmul_fast, fsub_fast},
 };
 
 use num_complex::Complex64;
@@ -37,20 +37,19 @@ impl Filter for Biquad {
             for frame in channel.iter_mut() {
                 let x = *frame as f64;
 
-                // Lame version:
-                let y = b0 * x + b1 * x_memory[0] + b2 * x_memory[1]
-                    - a1 * y_memory[0]
-                    - a2 * y_memory[1];
+                let mut y = unsafe {
+                    let preset = fmul_fast(b0, x);
+                    let feedforward =
+                        fadd_fast(fmul_fast(b1, x_memory[0]), fmul_fast(b2, x_memory[1]));
+                    let feedback =
+                        fadd_fast(fmul_fast(a1, y_memory[0]), fmul_fast(a2, y_memory[1]));
 
-                // let y = unsafe {
-                //     let preset = fmul_fast(b0, x);
-                //     let feedforward =
-                //         fadd_fast(fmul_fast(b1, x_memory[0]), fmul_fast(b2, x_memory[1]));
-                //     let feedback =
-                //         fadd_fast(fmul_fast(a1, y_memory[0]), fmul_fast(a2, y_memory[1]));
-                //
-                //     fsub_fast(fadd_fast(preset, feedforward), feedback)
-                // };
+                    fsub_fast(fadd_fast(preset, feedforward), feedback)
+                };
+
+                if !y.is_finite() {
+                    y = 0.;
+                }
 
                 y_memory[1] = y_memory[0];
                 x_memory[1] = x_memory[0];
@@ -112,7 +111,7 @@ impl Biquad {
         self.b2 = (1. - omega_0.cos()) / 2.;
         self.a0 = 1. + alpha;
         self.a1 = -2. * omega_0.cos();
-        self.a2 = 1. - alpha;
+        self.a2 = 1. - alpha;    
     }
 
     pub fn hpf(&mut self, cutoff: f32, q: f32, sample_rate: f32) {
@@ -196,7 +195,7 @@ impl Biquad {
         if cutoff >= sample_rate / 2. {
             return;
         }
-        
+
         let A = 10f32.powf(gain / 40.) as f64;
         let omega_0 = (2. * f32::consts::PI * cutoff / sample_rate) as f64;
         let alpha = omega_0.sin() / (2. * q as f64);
