@@ -1,6 +1,6 @@
 use crate::{Biquad, Filter};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Scream {
     hpf: Biquad,
     lpf: Biquad,
@@ -13,37 +13,55 @@ impl Filter for Scream {
     fn process(&mut self, data: &mut [Vec<f32>]) {
         for (channel_i, channel) in data.iter_mut().enumerate() {
             for sample_ref in channel.iter_mut() {
-                self.input_volume[channel_i] =
-                    lerp(self.input_volume[channel_i], sample_ref.abs(), 0.01);
-
-                let mut feedback_gain = self.feedback_gain;
-
-                const THRESHOLD: f32 = 0.05;
-                if self.input_volume[channel_i] < THRESHOLD {
-                    feedback_gain *= self.input_volume[channel_i] / THRESHOLD;
-                }
-
-                // Based on https://github.com/Speechrezz/Scream-Filter
-                let mut sample = (*sample_ref + self.prev_samples[channel_i]).tanh();
-                self.lpf.process_sample(&mut sample, channel_i);
-                *sample_ref = sample;
-                self.hpf.process_sample(&mut sample, channel_i);
-                sample = (sample * feedback_gain).tanh();
-                self.prev_samples[channel_i] = sample;
+                self.process_sample(sample_ref, channel_i);
             }
         }
     }
 
     fn transfer_function(&self, f: f32, sample_rate: f32) -> num_complex::Complex64 {
-        self.hpf.transfer_function(f, sample_rate) * self.lpf.transfer_function(f, sample_rate)
+        let mut filter = self.clone();
+
+        const SAMPLES: i32 = 1000;
+        let mut sum = 0.;
+        for i in 0..1000 {
+            let t = i as f32 / sample_rate;
+            let phase = t * f * std::f32::consts::TAU;
+            let mut sample = phase.sin();
+            filter.process_sample(&mut sample, 0);
+            sum += sample * sample;
+        }
+        let rms = (sum / SAMPLES as f32).sqrt();
+
+        num_complex::Complex { re: rms as f64, im: 0. }
     }
 
     fn bandwidth(&self, _sample_rate: f32) -> f32 {
         todo!()
     }
+
 }
 
 impl Scream {
+    #[inline(always)]
+    fn process_sample(&mut self, sample_ref: &mut f32, channel_i: usize) {
+        self.input_volume[channel_i] = lerp(self.input_volume[channel_i], sample_ref.abs(), 0.01);
+
+        let mut feedback_gain = self.feedback_gain;
+
+        const THRESHOLD: f32 = 0.05;
+        if self.input_volume[channel_i] < THRESHOLD {
+            feedback_gain *= self.input_volume[channel_i] / THRESHOLD;
+        }
+
+        // Based on https://github.com/Speechrezz/Scream-Filter
+        let mut sample = (*sample_ref + self.prev_samples[channel_i]).tanh();
+        self.lpf.process_sample(&mut sample, channel_i);
+        *sample_ref = sample;
+        self.hpf.process_sample(&mut sample, channel_i);
+        sample = (sample * feedback_gain).tanh();
+        self.prev_samples[channel_i] = sample;
+    }
+
     pub fn new() -> Self {
         Self::default()
     }

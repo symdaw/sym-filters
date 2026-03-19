@@ -7,7 +7,7 @@ use num_complex::Complex64;
 
 use crate::Filter;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct Biquad {
     y_memory: [[f64; 2]; 16],
     x_memory: [[f64; 2]; 16],
