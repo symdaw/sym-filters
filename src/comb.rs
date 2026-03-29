@@ -4,6 +4,7 @@ use num_complex::Complex64;
 
 use crate::Filter;
 
+#[derive(Clone)]
 pub struct Comb<const Channels: usize, const Frames: usize> {
     pub gain1: f64,
     pub gain2: f64,
@@ -89,6 +90,10 @@ impl<const Channels: usize, const Frames: usize> Filter for Comb<Channels, Frame
     }
 
     fn bandwidth(&self, _sample_rate: f32) -> f32 {
+        todo!()
+    }
+
+    fn process_sample(&mut self, _sample: &mut f32, _channel_i: usize) {
         todo!()
     }
 }

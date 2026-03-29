@@ -10,41 +10,13 @@ pub struct Scream {
 }
 
 impl Filter for Scream {
-    fn process(&mut self, data: &mut [Vec<f32>]) {
-        for (channel_i, channel) in data.iter_mut().enumerate() {
-            for sample_ref in channel.iter_mut() {
-                self.process_sample(sample_ref, channel_i);
-            }
-        }
-    }
-
-    fn transfer_function(&self, f: f32, sample_rate: f32) -> num_complex::Complex64 {
-        let mut filter = self.clone();
-
-        const SAMPLES: i32 = 1000;
-        let mut sum = 0.;
-        for i in 0..1000 {
-            let t = i as f32 / sample_rate;
-            let phase = t * f * std::f32::consts::TAU;
-            let mut sample = phase.sin();
-            filter.process_sample(&mut sample, 0);
-            sum += sample * sample;
-        }
-        let rms = (sum / SAMPLES as f32).sqrt();
-
-        num_complex::Complex { re: rms as f64, im: 0. }
-    }
-
     fn bandwidth(&self, _sample_rate: f32) -> f32 {
         todo!()
     }
 
-}
-
-impl Scream {
     #[inline(always)]
     fn process_sample(&mut self, sample_ref: &mut f32, channel_i: usize) {
-        self.input_volume[channel_i] = lerp(self.input_volume[channel_i], sample_ref.abs(), 0.01);
+        self.input_volume[channel_i] = crate::utils::lerp(self.input_volume[channel_i], sample_ref.abs(), 0.01);
 
         let mut feedback_gain = self.feedback_gain;
 
@@ -61,7 +33,9 @@ impl Scream {
         sample = (sample * feedback_gain).tanh();
         self.prev_samples[channel_i] = sample;
     }
+}
 
+impl Scream {
     pub fn new() -> Self {
         Self::default()
     }
@@ -71,8 +45,4 @@ impl Scream {
         self.hpf.hpf(scream, 1., sample_rate);
         self.feedback_gain = resonance;
     }
-}
-
-fn lerp(a: f32, b: f32, t: f32) -> f32 {
-    a + (b - a) * t
 }

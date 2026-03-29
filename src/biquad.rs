@@ -29,6 +29,36 @@ impl Filter for Biquad {
         }
     }
 
+    #[inline(always)]
+    fn process_sample(&mut self, sample: &mut f32, channel_i: usize) {
+        let x = *sample as f64;
+
+        let mut y = unsafe {
+            let present = fmul_fast(self.b0, x);
+            let feedforward = fadd_fast(
+                fmul_fast(self.b1, self.x_memory[channel_i][0]),
+                fmul_fast(self.b2, self.x_memory[channel_i][1]),
+            );
+            let feedback = fadd_fast(
+                fmul_fast(self.a1, self.y_memory[channel_i][0]),
+                fmul_fast(self.a2, self.y_memory[channel_i][1]),
+            );
+
+            fsub_fast(fadd_fast(present, feedforward), feedback)
+        };
+
+        if !y.is_finite() {
+            y = 0.;
+        }
+
+        self.y_memory[channel_i][1] = self.y_memory[channel_i][0];
+        self.x_memory[channel_i][1] = self.x_memory[channel_i][0];
+        self.y_memory[channel_i][0] = y;
+        self.x_memory[channel_i][0] = x;
+
+        *sample = y as f32;
+    }
+
     fn transfer_function(&self, f: f32, sample_rate: f32) -> Complex64 {
         //    H(z) = (b0 + b1 z^-1 + b2 z^-2) / (a0 + a1 z^-1 + a2 z^-2)
         //    let z = e^jωT
@@ -61,36 +91,6 @@ impl Biquad {
         self.a1 /= self.a0;
         self.a2 /= self.a0;
         self.a0 = 1.;
-    }
-
-    #[inline(always)]
-    pub(crate) fn process_sample(&mut self, sample: &mut f32, channel_i: usize) {
-        let x = *sample as f64;
-
-        let mut y = unsafe {
-            let present = fmul_fast(self.b0, x);
-            let feedforward = fadd_fast(
-                fmul_fast(self.b1, self.x_memory[channel_i][0]),
-                fmul_fast(self.b2, self.x_memory[channel_i][1]),
-            );
-            let feedback = fadd_fast(
-                fmul_fast(self.a1, self.y_memory[channel_i][0]),
-                fmul_fast(self.a2, self.y_memory[channel_i][1]),
-            );
-
-            fsub_fast(fadd_fast(present, feedforward), feedback)
-        };
-
-        if !y.is_finite() {
-            y = 0.;
-        }
-
-        self.y_memory[channel_i][1] = self.y_memory[channel_i][0];
-        self.x_memory[channel_i][1] = self.x_memory[channel_i][0];
-        self.y_memory[channel_i][0] = y;
-        self.x_memory[channel_i][0] = x;
-
-        *sample = y as f32;
     }
 
     fn cleanup(&mut self, channel_i: usize) {
